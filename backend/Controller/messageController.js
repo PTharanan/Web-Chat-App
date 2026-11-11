@@ -30,7 +30,7 @@ export const sendMessage = async (req, res) => {
     try {
         const { text, receiver } = req.body;
         const message = await Message.create({
-            sender: req.use.username,
+            sender: req.user.username,
             receiver,
             text
 
