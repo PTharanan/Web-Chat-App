@@ -1,4 +1,5 @@
 import Message from "../Model/messageSchema.js"
+import ApiResponse from "../utils/ApiResponse.js"
 
 // Get messages between 2 users
 export const getMessages = async (req, res) => {
@@ -11,17 +12,10 @@ export const getMessages = async (req, res) => {
                 { sender: receiver, receiver: sender }
             ]
         }).sort({ timestamps: 1 });
-        res.status(200).json({
-            status: "success",
-            message: "Messages successfully get",
-            data: message
-        })
+        res.status(200).json(new ApiResponse(200, "Messages successfully get", message))
     } catch (error) {
         console.error(`MessageController getMessges error: ${error.message}`)
-        res.status(500).json({
-            status: "error",
-            message: "Failed to get messages"
-        })
+        res.status(500).json(new ApiResponse(500, "Failed to get messages"))
     }
 }
 
@@ -35,16 +29,9 @@ export const sendMessage = async (req, res) => {
             text
 
         })
-        res.status(201).json({
-            status: "success",
-            message: "Messages successfully send",
-            data: message
-        })
+        res.status(201).json(new ApiResponse(201, "Messages successfully send", message))
     } catch (error) {
         console.error(`MessageController sendMessge error: ${error.message}`)
-        res.status(500).json({
-            status: "error",
-            message: "Failed to send message"
-        })
+        res.status(500).json(new ApiResponse(500, "Failed to send message"))
     }
 }
