@@ -14,6 +14,11 @@ const userSchema = new mongoose.Schema(
             type: String,
             required: [true, "Password is required"]
         },
+        // status: {
+        //     type: String,
+        //     enum: ["active", "inactive", "suspended"],
+        //     default: "active"
+        // },
         loginAttempts: { type: Number, required: true, default: 0 },
         lockUntil: { type: Date }
     },
