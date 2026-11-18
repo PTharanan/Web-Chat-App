@@ -75,7 +75,7 @@ export const loginUser = async (req, res) => {
 
         if (!passwordMatch) {
             const MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS)
-            const LOCK_TIME_MS = Number(process.env.LOCK_TIME_MS)
+            const LOCK_TIME_MS = Number(process.env.LOCK_TIME_MS) * 60 * 1000 || 5 * 60 * 60 * 1000
 
             const isLockExpired = lockUntilTime > 0 && lockUntilTime <= now;
             const newAttempts = isLockExpired ? 1 : (user.loginAttempts || 0) + 1;
