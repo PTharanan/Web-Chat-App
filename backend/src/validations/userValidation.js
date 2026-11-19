@@ -1,3 +1,5 @@
+import ApiResponse from "../utils/ApiResponse.js"
+
 export const validateUsername = (req, res, next) => {
     // Body Safety: Prevents crash if req.body is undefined
     const { username } = req.body || {};
@@ -84,6 +86,36 @@ export const validatePassword = (req, res, next) => {
     req.validatedData = {
         ...req.validatedData,
         password: cleanPassword
+    };
+
+    next();
+};
+
+export const validateEmail = (req, res, next) => {
+    // Body Safety: Prevents crash if req.body is undefined
+    const { email } = req.body || {};
+
+    if (typeof email !== "string") {
+        return res.status(400).json(new ApiResponse(400, "Email is required and must be a valid text"))
+    }
+
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail) {
+        return res.status(400).json(new ApiResponse(400, "Email is required"))
+    }
+
+    // Regex Pattern (At least 1 uppercase, 1 number [0-9], length 8-16)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(cleanEmail)) {
+        return res.status(400).json(new ApiResponse(400, "Please provide a valid email address"))
+    }
+
+    // Merge with existing validatedData (Prevents overwriting username!)
+    req.validatedData = {
+        ...req.validatedData,
+        email: cleanEmail
     };
 
     next();
