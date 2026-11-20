@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import ApiResponse from "../utils/ApiResponse.js"
 import "dotenv/config"
+import { sendWelcomeEmail } from "../emails/emailHandlers.js"
 
 export const findUserByUsername = async (username, selectFields = "_id") => {
     try {
@@ -10,6 +11,16 @@ export const findUserByUsername = async (username, selectFields = "_id") => {
 
     } catch (error) {
         console.error(`UserController findUserByUsername error: ${error.message}`)
+        throw error;
+    }
+}
+
+export const findUserByEmail = async (email, selectFields = "_id") => {
+    try {
+        return await User.findOne({ email }).select(selectFields).lean();
+
+    } catch (error) {
+        console.error(`UserController findUserByEmail error: ${error.message}`)
         throw error;
     }
 }
@@ -22,32 +33,51 @@ export const getUserByName = async (req, res) => {
 
     } catch (error) {
         console.error(`UserController GetUserByName error: ${error.message}`)
-        res.status(500).json(new ApiResponse(500, "Failed to Get all users"))
+        return res.status(500).json(new ApiResponse(500, "Failed to Get all users"))
     }
 }
 
 // Add New User
 export const addNewUser = async (req, res) => {
     try {
-        const { username, password } = req.validatedData
-        const existingUser = await findUserByUsername(username, "_id")
+        const { username, email, password } = req.validatedData
+        const existingUser = await User.findOne(
+            { $or: [{ username }, { email }] },
+            "username email"
+        ).lean();
 
         if (existingUser) {
-            return res.status(409).json(new ApiResponse(409, "Username is already taken"));
+            const message = existingUser.username === username
+                ? "Username is already taken"
+                : "Email is already taken";
+            return res.status(409).json(new ApiResponse(409, message));
         }
 
         const hashPassword = await bcrypt.hash(password, 10)
-        const user = await User.create({ username, password: hashPassword })
+        const newUser = await User.create({ username, email, password: hashPassword })
+
+        if (newUser) {
+            try {
+                Promise.resolve(sendWelcomeEmail(email, username, process.env.CLIENT_URL))
+                    .catch((err) => console.error("Async email error:", err));
+            } catch (emailErr) {
+                console.error("Sync email error:", emailErr);
+            }
+        }
 
         return res.status(201).json(new ApiResponse(201, "Successfully created user"));
 
 
     } catch (error) {
         if (error.code === 11000) {
-            return res.status(409).json(new ApiResponse(409, "Username is already taken"));
+            const duplicateField = Object.keys(error.keyPattern || {})[0];
+            const message = duplicateField === "email"
+                ? "Email is already taken"
+                : "Username is already taken";
+            return res.status(409).json(new ApiResponse(409, message));
         }
         console.error(`UserController AddNewUser error: ${error.message}`)
-        res.status(500).json(new ApiResponse(500, "Failed to Add user"))
+        return res.status(500).json(new ApiResponse(500, "Failed to Add user"))
     }
 }
 
@@ -74,8 +104,8 @@ export const loginUser = async (req, res) => {
         const passwordMatch = await bcrypt.compare(password, user.password)
 
         if (!passwordMatch) {
-            const MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS)
-            const LOCK_TIME_MS = Number(process.env.LOCK_TIME_MS) * 60 * 1000 || 5 * 60 * 60 * 1000
+            const MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS) || 5
+            const LOCK_TIME_HOURS = Number(process.env.LOCK_TIME_HOURS) * 60 * 60 * 1000 || 5 * 60 * 60 * 1000
 
             const isLockExpired = lockUntilTime > 0 && lockUntilTime <= now;
             const newAttempts = isLockExpired ? 1 : (user.loginAttempts || 0) + 1;
@@ -84,7 +114,7 @@ export const loginUser = async (req, res) => {
             let unsetData = {};
 
             if (newAttempts >= MAX_ATTEMPTS) {
-                updateData.lockUntil = new Date(now + LOCK_TIME_MS);
+                updateData.lockUntil = new Date(now + LOCK_TIME_HOURS);
             } else if (isLockExpired) {
                 unsetData.lockUntil = 1;
             }
@@ -115,18 +145,23 @@ export const loginUser = async (req, res) => {
         const token = jwt.sign(
             { id: user._id, username },
             process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN }
+            { expiresIn: process.env.JWT_EXPIRES_IN || "1d" }
         )
 
-        return res.status(200).json(new ApiResponse(
-            200,
-            "Successfully login user",
-            { username, token }
-        ));
+        const isProduction = process.env.NODE_ENV === "production";
+
+        return res.status(200)
+            .cookie("jwt", token, {
+                maxAge: Number(process.env.COOKIE_EXPIRES_DAYS) * 24 * 60 * 60 * 1000 || 1 * 24 * 60 * 60 * 1000,
+                httpOnly: true,
+                secure: isProduction,
+                sameSite: isProduction ? "strict" : "lax"
+            })
+            .json(new ApiResponse(200, "Successfully login user", { username: user?.username }));
 
     } catch (error) {
         console.error(`UserController loginUser error: ${error.message}`)
-        res.status(500).json(new ApiResponse(500, "Failed to Login user"))
+        return res.status(500).json(new ApiResponse(500, "Failed to Login user"))
     }
 }
 
