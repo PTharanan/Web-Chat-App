@@ -2,8 +2,8 @@ import User from "../Model/userSchema.js"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import ApiResponse from "../utils/ApiResponse.js"
-import "dotenv/config"
-import { sendWelcomeEmail } from "../emails/emailHandlers.js"
+import { enqueueWelcomeEmail } from "../queues/emailQueue.js"
+import { ENV } from "../utils/env.js"
 
 export const findUserByUsername = async (username, selectFields = "_id") => {
     try {
@@ -25,7 +25,7 @@ export const findUserByEmail = async (email, selectFields = "_id") => {
     }
 }
 
-// Get All Users by username not in current user
+// Get All by username not in current user
 export const getUserByName = async (req, res) => {
     try {
         const users = await User.find({ username: { $ne: req.user?.username } }).select("username").lean();
@@ -37,7 +37,6 @@ export const getUserByName = async (req, res) => {
     }
 }
 
-// Add New User
 export const addNewUser = async (req, res) => {
     try {
         const { username, email, password } = req.validatedData
@@ -56,13 +55,15 @@ export const addNewUser = async (req, res) => {
         const hashPassword = await bcrypt.hash(password, 10)
         const newUser = await User.create({ username, email, password: hashPassword })
 
-        if (newUser) {
-            try {
-                Promise.resolve(sendWelcomeEmail(email, username, process.env.CLIENT_URL))
-                    .catch((err) => console.error("Async email error:", err));
-            } catch (emailErr) {
-                console.error("Sync email error:", emailErr);
-            }
+        try {
+            await enqueueWelcomeEmail({
+                userId: newUser._id.toString(),
+                email,
+                name: username,
+                clientURL: ENV.CLIENT_URL
+            });
+        } catch (emailQueueError) {
+            console.error("Failed to enqueue welcome email:", emailQueueError);
         }
 
         return res.status(201).json(new ApiResponse(201, "Successfully created user"));
@@ -104,8 +105,8 @@ export const loginUser = async (req, res) => {
         const passwordMatch = await bcrypt.compare(password, user.password)
 
         if (!passwordMatch) {
-            const MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS) || 5
-            const LOCK_TIME_HOURS = Number(process.env.LOCK_TIME_HOURS) * 60 * 60 * 1000 || 5 * 60 * 60 * 1000
+            const MAX_ATTEMPTS = ENV.MAX_ATTEMPTS
+            const LOCK_TIME_HOURS = ENV.LOCK_TIME_HOURS
 
             const isLockExpired = lockUntilTime > 0 && lockUntilTime <= now;
             const newAttempts = isLockExpired ? 1 : (user.loginAttempts || 0) + 1;
@@ -144,15 +145,15 @@ export const loginUser = async (req, res) => {
         // JWT Token
         const token = jwt.sign(
             { id: user._id, username },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || "1d" }
+            ENV.JWT_SECRET,
+            { expiresIn: ENV.JWT_EXPIRES_IN || "1d" }
         )
 
-        const isProduction = process.env.NODE_ENV === "production";
+        const isProduction = ENV.NODE_ENV === "production";
 
         return res.status(200)
             .cookie("jwt", token, {
-                maxAge: Number(process.env.COOKIE_EXPIRES_DAYS) * 24 * 60 * 60 * 1000 || 1 * 24 * 60 * 60 * 1000,
+                maxAge: ENV.COOKIE_EXPIRES_DAYS,
                 httpOnly: true,
                 secure: isProduction,
                 sameSite: isProduction ? "strict" : "lax"
@@ -162,6 +163,17 @@ export const loginUser = async (req, res) => {
     } catch (error) {
         console.error(`UserController loginUser error: ${error.message}`)
         return res.status(500).json(new ApiResponse(500, "Failed to Login user"))
+    }
+}
+
+export const logoutUser = (_, res) => {
+    try {
+        res.status(200)
+            .cookies("jwt", "", { maxAge: 0 })
+            .json(new ApiResponse(200, "Successfully logout"));
+
+    } catch (error) {
+
     }
 }
 

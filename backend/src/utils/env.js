@@ -5,7 +5,7 @@ export const ENV = Object.freeze({
     NODE_ENV: process.env.NODE_ENV || "development",
     MONGO_URI: process.env.MONGO_URI,
     CLIENT_URL: process.env.CLIENT_URL,
-    ALLOW_REGISTRATION: Boolean(process.env.ALLOW_REGISTRATION || true),
+    ALLOW_REGISTRATION: process.env.ALLOW_REGISTRATION,
 
     JWT_SECRET: process.env.JWT_SECRET,
     JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,
@@ -21,5 +21,6 @@ export const ENV = Object.freeze({
 
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM,
-    EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME
+    EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME,
+    REDIS_URL: process.env.REDIS_URL
 })

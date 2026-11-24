@@ -12,7 +12,7 @@ export const validateUsername = (req, res, next) => {
         });
     }
 
-    const cleanUsername = username.trim();
+    const cleanUsername = username.trim().toLowerCase();
 
     if (!cleanUsername) {
         return res.status(400).json({
