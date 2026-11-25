@@ -96,3 +96,33 @@ export const startWelcomeEmailWorker = async () => {
 
     return emailWorker;
 };
+
+export const closeWelcomeEmailQueue = async () => {
+    let closeError;
+
+    if (emailWorker) {
+        try {
+            await emailWorker.close();
+        } catch (error) {
+            closeError = error;
+        }
+        emailWorker = undefined;
+    }
+
+    if (emailQueue) {
+        try {
+            await emailQueue.close();
+        } catch (error) {
+            if (!closeError) {
+                closeError = error;
+            }
+        }
+        emailQueue = undefined;
+    }
+
+    if (closeError) {
+        throw closeError;
+    }
+
+    console.log("Welcome email queue closed");
+};

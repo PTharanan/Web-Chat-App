@@ -29,11 +29,4 @@ mongoose.connection.on("error", (err) => {
     console.error(`MongoDB runtime error: ${err.message}`);
 });
 
-// Graceful shutdown handling (e.g., Ctrl+C or Docker stop)
-process.on("SIGINT", async () => {
-    await mongoose.connection.close();
-    console.log("MongoDB connection closed due to application termination.");
-    process.exit(0);
-});
-
 export default connectDB;
