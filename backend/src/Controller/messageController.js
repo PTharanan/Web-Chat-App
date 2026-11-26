@@ -1,4 +1,5 @@
 import Message from "../Model/messageSchema.js"
+import User from "../Model/userSchema.js"
 import ApiResponse from "../utils/ApiResponse.js"
 
 // Get messages between 2 users
@@ -33,5 +34,17 @@ export const sendMessage = async (req, res) => {
     } catch (error) {
         console.error(`MessageController sendMessge error: ${error.message}`)
         res.status(500).json(new ApiResponse(500, "Failed to send message"))
+    }
+}
+
+export const getAllContacts = async (req, res) => {
+    try {
+        const loggedInUserId = req.user.id;
+        const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password")
+        res.status(200).json(new ApiResponse(200, "Successfully getAllContacts", filteredUsers))
+
+    } catch (error) {
+        console.error(`MessageController getAllContacts error: ${error.message}`)
+        res.status(500).json(new ApiResponse(500, "Sever error"))
     }
 }

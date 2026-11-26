@@ -1,6 +1,7 @@
 import { ENV } from "./utils/env.js"
 import express from "express"
 import cors from "cors"
+import cookieParser from "cookie-parser"
 import http from "http"
 import mongoose from "mongoose"
 import connectDB from "./Config/db.js"
@@ -16,6 +17,7 @@ const server = http.createServer(app)
 let shutdownStarted = false;
 
 app.use(cors())
+app.use(cookieParser())
 app.use(express.json())
 const port = Number(ENV.PORT)
 

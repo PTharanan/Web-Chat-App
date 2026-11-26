@@ -5,6 +5,16 @@ import ApiResponse from "../utils/ApiResponse.js"
 import { enqueueWelcomeEmail } from "../queues/emailQueue.js"
 import { ENV } from "../utils/env.js"
 
+const getAuthCookieOptions = () => {
+    const isProduction = ENV.NODE_ENV === "production";
+
+    return {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax"
+    };
+};
+
 export const findUserByUsername = async (username, selectFields = "_id") => {
     try {
         return await User.findOne({ username }).select(selectFields).lean();
@@ -149,14 +159,10 @@ export const loginUser = async (req, res) => {
             { expiresIn: ENV.JWT_EXPIRES_IN || "1d" }
         )
 
-        const isProduction = ENV.NODE_ENV === "production";
-
         return res.status(200)
             .cookie("jwt", token, {
+                ...getAuthCookieOptions(),
                 maxAge: ENV.COOKIE_EXPIRES_DAYS,
-                httpOnly: true,
-                secure: isProduction,
-                sameSite: isProduction ? "strict" : "lax"
             })
             .json(new ApiResponse(200, "Successfully login user", { username: user?.username }));
 
@@ -167,14 +173,9 @@ export const loginUser = async (req, res) => {
 }
 
 export const logoutUser = (_, res) => {
-    try {
-        res.status(200)
-            .cookies("jwt", "", { maxAge: 0 })
-            .json(new ApiResponse(200, "Successfully logout"));
-
-    } catch (error) {
-
-    }
+    return res.clearCookie("jwt", getAuthCookieOptions())
+        .status(200)
+        .json(new ApiResponse(200, "Successfully logout"));
 }
 
 
