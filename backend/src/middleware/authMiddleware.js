@@ -3,21 +3,12 @@ import { ENV } from "../utils/env.js"
 
 export const auth = (req, res, next) => {
     try {
-        const authHeader = req.headers.authorization
-
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return res.status(401).json({
-                success: false,
-                message: "Access denied. No token provided!"
-            });
-        }
-
-        const token = authHeader.split(" ")[1];
+        const token = req.cookies?.jwt;
 
         if (!token) {
             return res.status(401).json({
                 success: false,
-                message: "The token is in an invalid format!"
+                message: "Access denied. No token provided!"
             });
         }
 
